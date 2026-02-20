@@ -1,0 +1,155 @@
+#+TITLE: SentinelPi
+#+AUTHOR: Vaishakh G K
+#+EMAIL: vaishakh@vaishakhgk.com
+
+SentinelPi is a Raspberry Pi powered modular hardware penetration testing platform designed for controlled security research and academic demonstration. The device integrates multiple physical and wireless attack vectors into a unified embedded system with a dedicated touchscreen interface.
+
+The project focuses on understanding hardware-level vulnerabilities, wireless communication weaknesses, and interface exploitation techniques in a controlled and ethical environment.
+
+* Table of Contents :toc:
+- [[#overview][Overview]]
+- [[#features][Features]]
+- [[#system-architecture][System Architecture]]
+- [[#hardware-components][Hardware Components]]
+- [[#software-stack][Software Stack]]
+- [[#installation-and-setup][Installation and Setup]]
+- [[#usage][Usage]]
+- [[#security-and-ethical-use][Security and Ethical Use]]
+- [[#license][License]]
+- [[#contact][Contact]]
+
+* Overview
+SentinelPi combines multiple security assessment modules into a single portable embedded platform. Each module operates independently and is managed through a unified graphical interface.
+
+The system is designed for:
+- Academic research
+- Security awareness demonstrations
+- Controlled penetration testing labs
+- Embedded systems experimentation
+
+* Features
+
+**** Modular Architecture
+- Each attack vector is implemented as an independent module.
+- Modules can be started and stopped dynamically from the UI.
+- Subprocess-based execution for stability and isolation.
+
+**** Bad USB Simulation
+- STM32-based USB HID emulation.
+- Demonstrates keystroke injection techniques.
+- Useful for studying endpoint security mechanisms.
+
+**** 2.4 GHz Wireless Testing
+- nRF24L01+PA+LNA module integration.
+- Channel analysis and signal experimentation.
+- Demonstrates wireless protocol weaknesses.
+
+**** RFID / NFC Testing
+- PN532 integration.
+- RFID tag reading and interaction.
+- Security evaluation of proximity-based systems.
+
+**** Infrared Command Injection
+- IR transmitter and receiver support.
+- Replay and capture of IR signals.
+- Demonstration of consumer device vulnerabilities.
+
+**** Touchscreen Interface
+- 7-inch HDMI display.
+- Fullscreen kiosk-style interface.
+- Real-time module status monitoring.
+
+**** Process Management System
+- Non-blocking execution model.
+- Safe start/stop handling.
+- Crash recovery capability.
+
+* System Architecture
+
+The platform follows a modular layered architecture:
+
+1. User Interface Layer (Kivy-based GUI)
+2. Core Process Manager
+3. Hardware Module Layer
+4. Device Driver / GPIO Layer
+
+Each module runs independently and communicates only through defined interfaces to maintain stability and extensibility.
+
+* Hardware Components
+
+- Raspberry Pi (Primary Controller)
+- nRF24L01+PA+LNA (2.4 GHz wireless module)
+- PN532 (RFID/NFC module)
+- STM32 (Bad USB controller)
+- IR Transmitter and Receiver
+- 7-inch HDMI Touchscreen
+- External regulated power supply
+
+* Software Stack
+
+- Python 3
+- Kivy (Touchscreen UI Framework)
+- SPI / GPIO interfaces
+- Subprocess-based module execution
+- Linux systemd service for boot management
+
+* Installation and Setup
+
+***** 1. Clone the repository
+#+begin_src bash
+git clone https://github.com/<username>/SentinelPi.git
+cd SentinelPi
+#+end_src
+
+***** 2. Install dependencies
+#+begin_src bash
+pip install -r requirements.txt
+#+end_src
+
+***** 3. Run application (development mode)
+#+begin_src bash
+python3 app/main.py
+#+end_src
+
+***** 4. Optional: Enable auto-start (production mode)
+Configure systemd service from the scripts/ directory.
+
+* Usage
+
+- Boot device
+- System launches directly into fullscreen interface
+- Select desired module
+- Start / Stop operations using touchscreen controls
+- Monitor module status in real time
+
+* Security and Ethical Use
+
+SentinelPi is strictly intended for:
+
+- Educational purposes
+- Authorized penetration testing
+- Security research in controlled environments
+
+Unauthorized use against systems without explicit permission is illegal and unethical.
+
+The developer assumes no responsibility for misuse of this project.
+
+* License
+[[file:LICENSE][The GPLv3 License (GPLv3)]]
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see [[https://www.gnu.org/licenses/gpl-3.0][GPLv3]].
+
+* Contact
+- Email: [[mailto:vaishakh@vaishakhgk.com][vaishakh@vaishakhgk.com]]
+- Website: [[https://vaishakhgk.com][Vaishakh GK]]
+- Github: [[https://github.com/VAISHAKH-GK/][VAISHAKH-GK]]
