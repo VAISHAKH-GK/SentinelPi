@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """
 SentinelPi — Entry Point
-Author: Vaishakh G K
 Run: python3 app/main.py --windowed
 """
-
 import sys
 import os
 
-# Add app/ to path so all sibling files import each other directly
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if APP_DIR not in sys.path:
     sys.path.insert(0, APP_DIR)

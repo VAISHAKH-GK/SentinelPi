@@ -1,20 +1,16 @@
-"""SentinelPi — NFC / RFID Page"""
+"""SentinelPi — NFC / RFID Page (Touchscreen)"""
 
 import os
-from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QLineEdit, QStackedWidget
-)
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget, QLineEdit, QLabel
 from base_page import BaseModulePage
 
 MODS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../modules", "nfc")
 
 
 class NfcPage(BaseModulePage):
-    PAGE_TITLE    = "NFC / RFID"
-    PAGE_SUBTITLE = "PN532 — proximity tag interaction"
-    MODULE_KEY    = "nfc"
+    PAGE_TITLE = "NFC / RFID"
+    PAGE_CHIP  = "PN532 · SPI"
+    MODULE_KEY = "nfc"
 
     SCRIPTS = {
         "Read":    os.path.join(MODS, "nfc_read.py"),
@@ -24,81 +20,72 @@ class NfcPage(BaseModulePage):
     }
 
     def __init__(self):
-        self._active_mode = "Read"
+        self._active = "Read"
+        self._mode_btns = []
         super().__init__()
 
-    @property
     def SCRIPT_PATH(self):
-        return self.SCRIPTS[self._active_mode]
+        return self.SCRIPTS[self._active]
+
+    def _build_mode_bar(self, layout):
+        for mode in self.SCRIPTS:
+            btn = self._make_mode_btn(mode, lambda _, m=mode: self._set_mode(m))
+            layout.addWidget(btn)
+            self._mode_btns.append(btn)
+        self._activate_mode_btn(self._mode_btns[0], self._mode_btns)
 
     def _build_controls(self, layout):
-        layout.addWidget(self._lbl("MODE"))
-        mode_row = QHBoxLayout(); mode_row.setSpacing(6)
-        self._mode_buttons = {}
-        for mode in self.SCRIPTS:
-            btn = QPushButton(mode.upper())
-            btn.setObjectName("module_card"); btn.setFixedHeight(44)
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _, m=mode: self._set_mode(m))
-            mode_row.addWidget(btn); self._mode_buttons[mode] = btn
-        layout.addLayout(mode_row)
-        layout.addSpacing(8)
-
         self._stack = QStackedWidget()
         self._stack.addWidget(self._read_panel())
         self._stack.addWidget(self._write_panel())
         self._stack.addWidget(self._emulate_panel())
         self._stack.addWidget(self._clone_panel())
         layout.addWidget(self._stack)
-        self._set_mode("Read")
 
     def _set_mode(self, mode):
-        self._active_mode = mode
+        self._active = mode
         self._stack.setCurrentIndex(list(self.SCRIPTS).index(mode))
-        for m, btn in self._mode_buttons.items():
-            btn.setStyleSheet("background:#001a0d;border:1px solid #00aa55;color:#00ff88;"
-                              if m == mode else "")
+        self._activate_mode_btn(
+            self._mode_btns[list(self.SCRIPTS).index(mode)], self._mode_btns
+        )
 
     def _get_script_args(self):
-        if self._active_mode == "Write":
+        if self._active == "Write":
             uid  = self._write_uid.text().strip()
             data = self._write_data.text().strip()
             return (["--uid", uid] if uid else []) + ["--data", data]
-        if self._active_mode == "Emulate":
+        if self._active == "Emulate":
             uid = self._emu_uid.text().strip()
             return ["--uid", uid] if uid else []
         return []
 
     def _read_panel(self):
-        w = QWidget(); vl = QVBoxLayout(w); vl.setContentsMargins(0,0,0,0)
-        i = QLabel("Place a tag near the PN532 antenna and press START to read its UID and data.")
-        i.setObjectName("info_label"); i.setWordWrap(True); vl.addWidget(i)
+        w = QWidget(); v = QVBoxLayout(w); v.setContentsMargins(0, 4, 0, 0)
+        i = QLabel("Place tag near PN532 antenna, then tap START.")
+        i.setObjectName("info_label"); i.setWordWrap(True); v.addWidget(i)
         return w
 
     def _write_panel(self):
-        w = QWidget(); vl = QVBoxLayout(w); vl.setContentsMargins(0,0,0,0); vl.setSpacing(8)
-        vl.addWidget(self._lbl("TARGET UID  (blank = any tag)"))
+        w = QWidget(); v = QVBoxLayout(w); v.setContentsMargins(0, 4, 0, 0); v.setSpacing(6)
+        v.addWidget(self._lbl("TARGET UID  (blank = any)"))
         self._write_uid = QLineEdit(); self._write_uid.setObjectName("input_field")
-        self._write_uid.setPlaceholderText("e.g.  04 A3 B1 22"); vl.addWidget(self._write_uid)
-        vl.addWidget(self._lbl("DATA TO WRITE"))
+        self._write_uid.setPlaceholderText("04 A3 B1 22"); v.addWidget(self._write_uid)
+        v.addWidget(self._lbl("DATA TO WRITE"))
         self._write_data = QLineEdit(); self._write_data.setObjectName("input_field")
-        self._write_data.setPlaceholderText("ASCII or hex string"); vl.addWidget(self._write_data)
+        self._write_data.setPlaceholderText("text or hex"); v.addWidget(self._write_data)
         return w
 
     def _emulate_panel(self):
-        w = QWidget(); vl = QVBoxLayout(w); vl.setContentsMargins(0,0,0,0); vl.setSpacing(8)
-        i = QLabel("Emulate a virtual NFC tag. Pi will respond as a tag to readers.")
-        i.setObjectName("info_label"); i.setWordWrap(True); vl.addWidget(i)
-        vl.addWidget(self._lbl("EMULATED UID"))
+        w = QWidget(); v = QVBoxLayout(w); v.setContentsMargins(0, 4, 0, 0); v.setSpacing(6)
+        i = QLabel("Pi responds as an NFC tag to any reader.")
+        i.setObjectName("info_label"); i.setWordWrap(True); v.addWidget(i)
+        v.addWidget(self._lbl("EMULATED UID"))
         self._emu_uid = QLineEdit(); self._emu_uid.setObjectName("input_field")
-        self._emu_uid.setPlaceholderText("e.g.  04 1A 2B 3C"); vl.addWidget(self._emu_uid)
+        self._emu_uid.setPlaceholderText("04 1A 2B 3C"); v.addWidget(self._emu_uid)
         return w
 
     def _clone_panel(self):
-        w = QWidget(); vl = QVBoxLayout(w); vl.setContentsMargins(0,0,0,0)
-        i = QLabel("Reads source tag then writes full content to a blank writable tag. Follow terminal prompts.")
-        i.setObjectName("info_label"); i.setWordWrap(True); vl.addWidget(i)
+        w = QWidget(); v = QVBoxLayout(w); v.setContentsMargins(0, 4, 0, 0)
+        i = QLabel("Step 1: place source tag → Step 2: place blank tag.\nFollow terminal prompts.")
+        i.setObjectName("info_label"); i.setWordWrap(True); v.addWidget(i)
         return w
-
-    def _lbl(self, text):
-        l = QLabel(text); l.setObjectName("section_label"); return l

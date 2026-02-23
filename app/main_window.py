@@ -1,21 +1,35 @@
 """
-SentinelPi — Main Window
-Sidebar navigation + stacked content pages.
+SentinelPi — Main Window (Touchscreen)
+StatusBar (36px top) + QStackedWidget (rest).
+No navigate_fn — pages emit back_requested signal.
 """
 
-from PyQt5.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
-    QPushButton, QLabel, QStackedWidget, QFrame
-)
-from PyQt5.QtCore import Qt, QTimer
-from datetime import datetime
+from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QStackedWidget
+from PyQt5.QtCore import Qt
 
 from style import STYLESHEET
-from dashboard import DashboardPage
+from status_bar import StatusBar
+from home_screen import HomeScreen
 from nfc_page import NfcPage
 from wireless_page import WirelessPage
 from badusb_page import BadUsbPage
 from infrared_page import InfraredPage
+from settings_page import SettingsPage
+
+PAGE_HOME     = 0
+PAGE_NFC      = 1
+PAGE_WIRELESS = 2
+PAGE_BADUSB   = 3
+PAGE_INFRARED = 4
+PAGE_SETTINGS = 5
+
+MODULE_MAP = {
+    "nfc":      PAGE_NFC,
+    "wireless": PAGE_WIRELESS,
+    "badusb":   PAGE_BADUSB,
+    "infrared": PAGE_INFRARED,
+    "settings": PAGE_SETTINGS,
+}
 
 
 class MainWindow(QMainWindow):
@@ -23,101 +37,45 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("SentinelPi")
         self.setStyleSheet(STYLESHEET)
-        self._build_ui()
-        self._clock_timer = QTimer()
-        self._clock_timer.timeout.connect(self._update_clock)
-        self._clock_timer.start(1000)
-        self._update_clock()
+        self._build()
 
-    def _build_ui(self):
-        root = QWidget()
-        root.setObjectName("root")
+    def _build(self):
+        root = QWidget(); root.setObjectName("root")
         self.setCentralWidget(root)
-        layout = QHBoxLayout(root)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(self._build_sidebar())
-        layout.addWidget(self._build_content(), 1)
-
-    def _build_sidebar(self):
-        sidebar = QWidget()
-        sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(180)
-        vl = QVBoxLayout(sidebar)
+        vl = QVBoxLayout(root)
         vl.setContentsMargins(0, 0, 0, 0)
         vl.setSpacing(0)
 
-        # Logo
-        logo_block = QWidget()
-        logo_block.setStyleSheet("padding: 20px 16px 16px 16px;")
-        lb = QVBoxLayout(logo_block)
-        lb.setContentsMargins(0, 0, 0, 0)
-        lb.setSpacing(2)
-        logo = QLabel("SENTINEL")
-        logo.setObjectName("logo")
-        lb.addWidget(logo)
-        logo2 = QLabel("Pi")
-        logo2.setObjectName("logo")
-        logo2.setStyleSheet("font-size:13px; color:#00aa55; letter-spacing:5px;")
-        lb.addWidget(logo2)
-        sub = QLabel("SECURITY PLATFORM")
-        sub.setObjectName("logo_sub")
-        lb.addWidget(sub)
-        vl.addWidget(logo_block)
+        self._statusbar = StatusBar()
+        vl.addWidget(self._statusbar)
 
-        d = QFrame(); d.setObjectName("divider"); d.setFixedHeight(1)
-        vl.addWidget(d)
-        vl.addSpacing(8)
-
-        # Nav
-        self._nav_buttons = []
-        nav_items = [
-            ("⬡  DASHBOARD", 0),
-            ("◈  NFC / RFID", 1),
-            ("◉  WIRELESS",   2),
-            ("▲  BAD USB",    3),
-            ("◐  INFRARED",   4),
-        ]
-        for label, idx in nav_items:
-            btn = QPushButton(label)
-            btn.setObjectName("nav_btn")
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda _, i=idx: self._navigate(i))
-            vl.addWidget(btn)
-            self._nav_buttons.append(btn)
-
-        vl.addStretch()
-
-        self._clock_label = QLabel()
-        self._clock_label.setAlignment(Qt.AlignCenter)
-        self._clock_label.setStyleSheet(
-            "font-size:10px; color:#333; padding:12px 0px; letter-spacing:1px;"
-        )
-        vl.addWidget(self._clock_label)
-        return sidebar
-
-    def _build_content(self):
-        content = QWidget()
-        content.setObjectName("content")
-        vl = QVBoxLayout(content)
-        vl.setContentsMargins(0, 0, 0, 0)
-        vl.setSpacing(0)
         self._stack = QStackedWidget()
-        for page in [DashboardPage(), NfcPage(), WirelessPage(), BadUsbPage(), InfraredPage()]:
+        vl.addWidget(self._stack, 1)
+
+        # Home screen (index 0)
+        self._home = HomeScreen()
+        self._home.module_selected.connect(self._navigate_to)
+        self._stack.addWidget(self._home)
+
+        # Module pages (indices 1-5)
+        for key, cls in [
+            ("nfc",      NfcPage),
+            ("wireless", WirelessPage),
+            ("badusb",   BadUsbPage),
+            ("infrared", InfraredPage),
+            ("settings", SettingsPage),
+        ]:
+            page = cls()
+            page.back_requested.connect(self._go_home)
             self._stack.addWidget(page)
-        vl.addWidget(self._stack)
-        self._navigate(0)
-        return content
 
-    def _navigate(self, index: int):
-        self._stack.setCurrentIndex(index)
-        for i, btn in enumerate(self._nav_buttons):
-            btn.setProperty("active", "true" if i == index else "false")
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
+        self._stack.setCurrentIndex(PAGE_HOME)
 
-    def _update_clock(self):
-        self._clock_label.setText(datetime.now().strftime("%H:%M:%S\n%Y-%m-%d"))
+    def _navigate_to(self, key: str):
+        self._stack.setCurrentIndex(MODULE_MAP.get(key, PAGE_HOME))
+
+    def _go_home(self):
+        self._stack.setCurrentIndex(PAGE_HOME)
 
     def closeEvent(self, event):
         from process_manager import process_manager
