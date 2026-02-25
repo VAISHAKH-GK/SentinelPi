@@ -7,6 +7,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QPushButton, QTextEdit, QLabel, QLineEdit, QFrame, QHBoxLayout
 )
+from ui.keyboard import KeyboardLineEdit
 
 CAPTURE_DIR = os.path.expanduser("~/SentinelPi/captures")
 os.makedirs(CAPTURE_DIR, exist_ok=True)
@@ -60,7 +61,7 @@ def input_field(label_text, placeholder="", default=""):
     lbl = QLabel(label_text)
     lbl.setObjectName("inputLabel")
     lbl.setFixedHeight(LABEL_H)
-    field = QLineEdit(default)
+    field = KeyboardLineEdit(default)
     field.setObjectName("inputField")
     field.setPlaceholderText(placeholder)
     field.setFixedHeight(INPUT_H)

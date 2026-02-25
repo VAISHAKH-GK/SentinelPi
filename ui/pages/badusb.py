@@ -3,6 +3,7 @@
 # Add a new attack: write a method + add it to build_menu()
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QScrollArea, QFrame
+from ui.keyboard import KeyboardTextEdit
 from ui.helpers import (title, divider, desc, log_box, input_field,
                         exec_btn, save_btn, back_btn, bottom_bar)
 from modules.badusb import custom_script, reverse_shell, send_payload
