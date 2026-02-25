@@ -98,35 +98,53 @@ class WirelessPage:
         lay.setSpacing(8)
 
         lay.addWidget(title("JAMMER"))
-        lay.addWidget(desc("WARNING: Authorised lab use only. Jamming is illegal outside controlled environments."))
+        lay.addWidget(desc("WARNING: Authorised lab use only."))
         lay.addWidget(divider())
 
         # ── Mode selector ──────────────────────────────────────────────
-        lay.addWidget(desc("Select jamming mode:"))
-
+        lay.addWidget(desc("Channel mode:"))
         mode_row = QHBoxLayout()
         mode_row.setSpacing(8)
-
-        btn_full = QPushButton("FULL SWEEP\n(channels 0-79)")
-        btn_ble  = QPushButton("BLE ONLY\n(ch 37, 38, 39)")
-        btn_wifi = QPushButton("WIFI ONLY\n(ch 1, 6, 11)")
-
+        btn_full = QPushButton("FULL\n(0-79)")
+        btn_ble  = QPushButton("BLE\n(37,38,39)")
+        btn_wifi = QPushButton("WIFI\n(1,6,11)")
         for b in [btn_full, btn_ble, btn_wifi]:
             b.setObjectName("attackBtn")
-            b.setMinimumHeight(60)
+            b.setMinimumHeight(56)
             b.setCheckable(True)
             mode_row.addWidget(b)
-
         mode_group = QButtonGroup()
         mode_group.addButton(btn_full, 0)
         mode_group.addButton(btn_ble,  1)
         mode_group.addButton(btn_wifi, 2)
         mode_group.setExclusive(True)
         btn_full.setChecked(True)
-
         lay.addLayout(mode_row)
+
+        # ── PA level selector ──────────────────────────────────────────
+        lay.addWidget(desc("Power level:"))
+        pa_row = QHBoxLayout()
+        pa_row.setSpacing(8)
+        btn_min  = QPushButton("MIN\nsame desk")
+        btn_low  = QPushButton("LOW\nsame room")
+        btn_high = QPushButton("HIGH\nthrough walls")
+        btn_max  = QPushButton("MAX\noutdoor")
+        for b in [btn_min, btn_low, btn_high, btn_max]:
+            b.setObjectName("attackBtn")
+            b.setMinimumHeight(56)
+            b.setCheckable(True)
+            pa_row.addWidget(b)
+        pa_group = QButtonGroup()
+        pa_group.addButton(btn_min,  0)
+        pa_group.addButton(btn_low,  1)
+        pa_group.addButton(btn_high, 2)
+        pa_group.addButton(btn_max,  3)
+        pa_group.setExclusive(True)
+        btn_low.setChecked(True)    # default = LOW, safe for bench testing
+        lay.addLayout(pa_row)
+
         lay.addWidget(divider())
-        # ── end mode selector ──────────────────────────────────────────
+        # ── end selectors ──────────────────────────────────────────────
 
         log = log_box()
         lay.addWidget(log)
@@ -134,23 +152,32 @@ class WirelessPage:
         start = exec_btn("START JAMMING")
         stop  = stop_btn("STOP")
 
+        all_btns = [btn_full, btn_ble, btn_wifi, btn_min, btn_low, btn_high, btn_max]
+
         def get_mode():
             if btn_ble.isChecked():  return "ble"
             if btn_wifi.isChecked(): return "wifi"
             return "full"
 
+        def get_pa():
+            if btn_min.isChecked():  return "MIN"
+            if btn_high.isChecked(): return "HIGH"
+            if btn_max.isChecked():  return "MAX"
+            return "LOW"
+
         def do_start():
             mode = get_mode()
-            log.append(f"[*] Starting jammer — mode: {mode}")
-            self.w._run(jammer.run, {"mode": mode}, log, start)
+            pa   = get_pa()
+            log.append(f"[*] Starting — mode: {mode}  PA: {pa}")
+            self.w._run(jammer.run, {"mode": mode, "pa_level": pa}, log, start)
             stop.setEnabled(True)
-            for b in [btn_full, btn_ble, btn_wifi]:
+            for b in all_btns:
                 b.setEnabled(False)
 
         def do_stop():
             jammer.stop()
             stop.setEnabled(False)
-            for b in [btn_full, btn_ble, btn_wifi]:
+            for b in all_btns:
                 b.setEnabled(True)
 
         start.clicked.connect(do_start)
@@ -158,3 +185,4 @@ class WirelessPage:
 
         lay.addLayout(btn_row(start, stop, back_btn(self.w._pop)))
         self.w._push(page)
+
