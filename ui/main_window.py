@@ -139,7 +139,10 @@ QFrame[frameShape="4"] { color: #1e3d2a; }
 
 
 class Worker(QThread):
-    result = pyqtSignal(str)
+    # line_ready fires for each live output line
+    # done fires once when the function exits
+    line_ready = pyqtSignal(str)
+    done       = pyqtSignal(str)   # empty = clean exit, else error message
 
     def __init__(self, func, kwargs=None):
         super().__init__()
@@ -148,10 +151,21 @@ class Worker(QThread):
 
     def run(self):
         try:
-            out = self.func(**self.kwargs)
-            self.result.emit(str(out))
+            # Pass log=... so modules can stream lines live.
+            # If the module does not accept log= yet it falls back gracefully.
+            self.func(log=self.line_ready.emit, **self.kwargs)
+            self.done.emit("")
+        except TypeError:
+            # Module run() does not accept log kwarg yet — call without it
+            try:
+                out = self.func(**self.kwargs)
+                if out:
+                    self.line_ready.emit(str(out))
+                self.done.emit("")
+            except Exception as e:
+                self.done.emit(f"[ERROR] {e}")
         except Exception as e:
-            self.result.emit(f"[ERROR] {e}")
+            self.done.emit(f"[ERROR] {e}")
 
 
 class MainWindow(QMainWindow):
@@ -204,13 +218,23 @@ class MainWindow(QMainWindow):
         log_widget.append("[*] Running...")
         btn_exec.setEnabled(False)
         self._worker = Worker(func, kwargs)
-        def done(result):
-            log_widget.append(result)
+
+        # Each line the module emits via log() appears immediately
+        self._worker.line_ready.connect(log_widget.append)
+
+        def on_done(error_msg):
+            if error_msg:
+                log_widget.append(error_msg)
+            else:
+                log_widget.append("[*] Done.")
             if hasattr(self, "global_log"):
                 ts = datetime.now().strftime("%H:%M:%S")
-                self.global_log.append(f"[{ts}] {result[:80]}")
+                log_widget_text = log_widget.toPlainText().strip().splitlines()
+                last = log_widget_text[-1] if log_widget_text else ""
+                self.global_log.append(f"[{ts}] {last[:80]}")
             btn_exec.setEnabled(True)
-        self._worker.result.connect(done)
+
+        self._worker.done.connect(on_done)
         self._worker.start()
 
     # ── Shared attack list builder (called by all page files) ─────────────
