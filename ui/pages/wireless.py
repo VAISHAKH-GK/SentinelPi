@@ -4,7 +4,7 @@
 #   1. Write a new method like _my_attack(self)
 #   2. Add it to the list in build_menu()
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QButtonGroup, QHBoxLayout
 from ui.helpers import title, divider, desc, log_box, input_field, exec_btn, stop_btn, save_btn, back_btn, btn_row
 
 from modules.wireless import channel_scan, jammer, packet_sniff, replay
@@ -14,8 +14,6 @@ class WirelessPage:
     def __init__(self, window):
         self.w = window
 
-    # ── Menu ─────────────────────────────────────────────────────────────
-
     def build_menu(self):
         attacks = [
             ("Channel Scan",  self._channel_scan),
@@ -24,8 +22,6 @@ class WirelessPage:
             ("Jammer",        self._jammer),
         ]
         self.w._attack_list("WIRELESS", attacks)
-
-    # ── Attack screens ────────────────────────────────────────────────────
 
     def _channel_scan(self):
         page = QWidget()
@@ -65,7 +61,6 @@ class WirelessPage:
         lay.addWidget(log)
 
         run = exec_btn("START SNIFF")
-        # When run() accepts args: {"channel": f_ch.text(), "count": f_n.text()}
         run.clicked.connect(lambda: self.w._run(packet_sniff.run, {}, log, run))
 
         lay.addLayout(btn_row(run, save_btn(log, "packet_sniff"), back_btn(self.w._pop)))
@@ -91,7 +86,6 @@ class WirelessPage:
         lay.addWidget(log)
 
         run = exec_btn("REPLAY")
-        # When run() accepts args: {"file": f_file.text(), "repeat": f_rep.text()}
         run.clicked.connect(lambda: self.w._run(replay.run, {}, log, run))
 
         lay.addLayout(btn_row(run, back_btn(self.w._pop)))
@@ -104,29 +98,60 @@ class WirelessPage:
         lay.setSpacing(8)
 
         lay.addWidget(title("JAMMER"))
-        lay.addWidget(desc("WARNING: Authorised lab use only."))
+        lay.addWidget(desc("WARNING: Authorised lab use only. Jamming is illegal outside controlled environments."))
         lay.addWidget(divider())
 
-        lbl_ch, f_ch = input_field("Target Channel (1-125)", "1", "1")
-        lay.addWidget(lbl_ch); lay.addWidget(f_ch)
-        lay.addWidget(divider())
+        # ── Mode selector ──────────────────────────────────────────────
+        lay.addWidget(desc("Select jamming mode:"))
 
-        log = log_box(100)
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(8)
+
+        btn_full = QPushButton("FULL SWEEP\n(channels 0-79)")
+        btn_ble  = QPushButton("BLE ONLY\n(ch 37, 38, 39)")
+        btn_wifi = QPushButton("WIFI ONLY\n(ch 1, 6, 11)")
+
+        for b in [btn_full, btn_ble, btn_wifi]:
+            b.setObjectName("attackBtn")
+            b.setMinimumHeight(60)
+            b.setCheckable(True)
+            mode_row.addWidget(b)
+
+        mode_group = QButtonGroup()
+        mode_group.addButton(btn_full, 0)
+        mode_group.addButton(btn_ble,  1)
+        mode_group.addButton(btn_wifi, 2)
+        mode_group.setExclusive(True)
+        btn_full.setChecked(True)
+
+        lay.addLayout(mode_row)
+        lay.addWidget(divider())
+        # ── end mode selector ──────────────────────────────────────────
+
+        log = log_box()
         lay.addWidget(log)
 
         start = exec_btn("START JAMMING")
         stop  = stop_btn("STOP")
 
+        def get_mode():
+            if btn_ble.isChecked():  return "ble"
+            if btn_wifi.isChecked(): return "wifi"
+            return "full"
+
         def do_start():
-            self.w._run(jammer.run, {}, log, start)
+            mode = get_mode()
+            log.append(f"[*] Starting jammer — mode: {mode}")
+            self.w._run(jammer.run, {"mode": mode}, log, start)
             stop.setEnabled(True)
+            for b in [btn_full, btn_ble, btn_wifi]:
+                b.setEnabled(False)
 
         def do_stop():
-            if self.w._worker:
-                self.w._worker.terminate()
-            log.append("[*] Jammer stopped.")
+            jammer.stop()
             stop.setEnabled(False)
-            start.setEnabled(True)
+            for b in [btn_full, btn_ble, btn_wifi]:
+                b.setEnabled(True)
 
         start.clicked.connect(do_start)
         stop.clicked.connect(do_stop)
