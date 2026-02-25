@@ -1,6 +1,6 @@
 # ui/main_window.py
-# Main window: status bar, main menu, and navigation helpers.
-# Attack screens live in ui/pages/ — one file per module.
+# Tuned for 800x480 Raspberry Pi touchscreen.
+# Runs fullscreen. Close button in status bar.
 
 import os
 import subprocess
@@ -9,140 +9,200 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QStackedWidget, QScrollArea,
-    QFrame, QGridLayout, QLineEdit, QTextEdit
+    QFrame, QGridLayout, QLineEdit, QTextEdit, QSizePolicy
 )
-from PyQt5.QtCore import QTimer, QThread, pyqtSignal
+from PyQt5.QtCore import QTimer, QThread, pyqtSignal, Qt
 
 from ui.pages.badusb    import BadUSBPage
 from ui.pages.infrared  import InfraredPage
 from ui.pages.wireless  import WirelessPage
 from ui.pages.nfc       import NFCPage
 
+# ── All sizes hardcoded for 800x480 ──────────────────────────────────────────
+# Status bar:  36px
+# Page area:   444px  (480 - 36)
+# Margins:     10px each side
+# Bottom bar (back/action buttons): always 52px fixed at bottom of each page
+
 STYLE = """
 QMainWindow, QWidget {
     background-color: #0d0f0e;
     color: #b8f5c8;
     font-family: 'Courier New', monospace;
+    font-size: 14px;
 }
+
+/* ── Status bar ── */
 #statusBar {
-    background-color: #111411;
-    border-bottom: 1px solid #1e3d2a;
+    background-color: #0a0f0b;
+    border-bottom: 2px solid #1e3d2a;
 }
-#statusLabel { color: #4caf6e; font-size: 13px; }
-#statusRight  { color: #2e7d4f; font-size: 13px; }
+#statusLabel {
+    color: #4caf6e;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+#statusRight {
+    color: #2e7d4f;
+    font-size: 12px;
+}
+
+/* ── Page title ── */
 #pageTitle {
     color: #5dff8f;
-    font-size: 20px;
-    font-weight: bold;
-    letter-spacing: 3px;
-    padding: 8px 0 4px 0;
-}
-#moduleTile {
-    background-color: #111714;
-    border: 1px solid #1e3d2a;
-    border-radius: 8px;
-    color: #7dffaa;
     font-size: 17px;
     font-weight: bold;
     letter-spacing: 2px;
-    padding: 28px 12px;
 }
-#moduleTile:pressed  { background-color: #1a2e20; border-color: #4caf6e; }
-#attackBtn {
-    background-color: #0f1a13;
-    border: 1px solid #1e3d2a;
-    border-radius: 6px;
-    color: #9effc0;
-    font-size: 15px;
-    padding: 16px;
-    text-align: left;
-}
-#attackBtn:pressed   { background-color: #172b1e; border-color: #4caf6e; }
-#backBtn {
-    background-color: #111411;
-    border: 1px solid #1e3d2a;
-    border-radius: 6px;
-    color: #4caf6e;
-    font-size: 14px;
-    padding: 10px 20px;
-}
-#backBtn:pressed     { background-color: #1a2e20; }
-#execBtn {
-    background-color: #173a22;
-    border: 1px solid #4caf6e;
-    border-radius: 6px;
-    color: #5dff8f;
-    font-size: 15px;
-    font-weight: bold;
-    padding: 14px;
-    letter-spacing: 1px;
-}
-#execBtn:pressed     { background-color: #1f5030; }
-#saveBtn {
-    background-color: #0f1a13;
-    border: 1px solid #2e7d4f;
-    border-radius: 6px;
-    color: #4caf6e;
-    font-size: 14px;
-    padding: 14px;
-}
-#saveBtn:pressed     { background-color: #172b1e; }
-#stopBtn {
-    background-color: #1a0d0d;
-    border: 1px solid #7d2e2e;
-    border-radius: 6px;
-    color: #ff6b6b;
-    font-size: 15px;
-    padding: 14px;
-}
-#stopBtn:pressed     { background-color: #2d1515; }
-#dangerBtn {
-    background-color: #1a0d0d;
-    border: 1px solid #7d2e2e;
-    border-radius: 6px;
-    color: #ff6b6b;
-    font-size: 13px;
-    padding: 8px 14px;
-}
-#dangerBtn:pressed   { background-color: #2d1515; }
-#settingsBtn {
-    background-color: #111411;
-    border: 1px solid #1e3d2a;
-    border-radius: 6px;
-    color: #4caf6e;
-    font-size: 13px;
-    padding: 8px 14px;
-}
-#settingsBtn:pressed { background-color: #1a2e20; }
-#logBox {
-    background-color: #080f0a;
+
+/* ── Main menu module tiles ── */
+#moduleTile {
+    background-color: #111714;
     border: 1px solid #1e3d2a;
     border-radius: 6px;
     color: #7dffaa;
-    font-size: 13px;
-    font-family: 'Courier New', monospace;
-    padding: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 1px;
 }
+#moduleTile:pressed { background-color: #1a2e20; border-color: #5dff8f; }
+
+/* ── Attack list buttons ── */
+#attackBtn {
+    background-color: #0f1a13;
+    border: 1px solid #1e3d2a;
+    border-radius: 5px;
+    color: #9effc0;
+    font-size: 14px;
+    padding: 0 12px;
+    text-align: left;
+}
+#attackBtn:pressed   { background-color: #172b1e; border-color: #4caf6e; }
+#attackBtn:checked   { background-color: #172b1e; border-color: #5dff8f; color: #5dff8f; }
+
+/* ── Bottom action bar buttons ── */
+#backBtn {
+    background-color: #111411;
+    border: 1px solid #1e3d2a;
+    border-radius: 5px;
+    color: #4caf6e;
+    font-size: 13px;
+    font-weight: bold;
+}
+#backBtn:pressed  { background-color: #1a2e20; }
+
+#execBtn {
+    background-color: #173a22;
+    border: 1px solid #4caf6e;
+    border-radius: 5px;
+    color: #5dff8f;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+#execBtn:pressed  { background-color: #1f5030; }
+#execBtn:disabled { background-color: #0f1a13; border-color: #1e3d2a; color: #2e7d4f; }
+
+#saveBtn {
+    background-color: #0f1a13;
+    border: 1px solid #2e7d4f;
+    border-radius: 5px;
+    color: #4caf6e;
+    font-size: 13px;
+}
+#saveBtn:pressed  { background-color: #172b1e; }
+
+#stopBtn {
+    background-color: #1a0d0d;
+    border: 1px solid #7d2e2e;
+    border-radius: 5px;
+    color: #ff6b6b;
+    font-size: 14px;
+    font-weight: bold;
+}
+#stopBtn:pressed  { background-color: #2d1515; }
+#stopBtn:disabled { background-color: #110808; border-color: #3d1515; color: #5d3030; }
+
+/* ── Status bar buttons ── */
+#closeBtn {
+    background-color: #1a0d0d;
+    border: 1px solid #7d2e2e;
+    border-radius: 4px;
+    color: #ff6b6b;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 10px;
+}
+#closeBtn:pressed { background-color: #2d1515; }
+
+#settingsBtn {
+    background-color: #111411;
+    border: 1px solid #1e3d2a;
+    border-radius: 4px;
+    color: #4caf6e;
+    font-size: 12px;
+    padding: 4px 10px;
+}
+#settingsBtn:pressed { background-color: #1a2e20; }
+
+#powerBtn {
+    background-color: #1a0d0d;
+    border: 1px solid #5d2020;
+    border-radius: 4px;
+    color: #cc4444;
+    font-size: 12px;
+    padding: 4px 10px;
+}
+#powerBtn:pressed { background-color: #2d1515; }
+
+/* ── Log output box ── */
+#logBox {
+    background-color: #060d07;
+    border: 1px solid #1a3020;
+    border-radius: 5px;
+    color: #7dffaa;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    padding: 4px;
+}
+
+/* ── Text inputs ── */
 #inputField {
     background-color: #0f1a13;
     border: 1px solid #2e7d4f;
-    border-radius: 6px;
+    border-radius: 5px;
     color: #9effc0;
-    font-size: 15px;
-    padding: 10px;
+    font-size: 14px;
+    padding: 6px 8px;
     font-family: 'Courier New', monospace;
 }
-#inputLabel { color: #4caf6e; font-size: 13px; padding-top: 4px; }
-#descLabel  { color: #4caf6e; font-size: 13px; }
-QFrame[frameShape="4"] { color: #1e3d2a; }
+#inputLabel {
+    color: #4caf6e;
+    font-size: 12px;
+}
+
+/* ── Misc ── */
+#descLabel  { color: #3d8f5f; font-size: 12px; }
+#warnLabel  { color: #cc7700; font-size: 12px; }
+QFrame[frameShape="4"] { color: #1a3020; max-height: 1px; }
+QScrollArea { border: none; background: transparent; }
+QScrollBar:vertical {
+    background: #0d0f0e;
+    width: 6px;
+}
+QScrollBar::handle:vertical {
+    background: #1e3d2a;
+    border-radius: 3px;
+}
 """
 
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Worker thread
+# ─────────────────────────────────────────────────────────────────────────────
 class Worker(QThread):
-    # line_ready fires for each live output line
-    # done fires once when the function exits
     line_ready = pyqtSignal(str)
-    done       = pyqtSignal(str)   # empty = clean exit, else error message
+    done       = pyqtSignal(str)
 
     def __init__(self, func, kwargs=None):
         super().__init__()
@@ -151,12 +211,9 @@ class Worker(QThread):
 
     def run(self):
         try:
-            # Pass log=... so modules can stream lines live.
-            # If the module does not accept log= yet it falls back gracefully.
             self.func(log=self.line_ready.emit, **self.kwargs)
             self.done.emit("")
         except TypeError:
-            # Module run() does not accept log kwarg yet — call without it
             try:
                 out = self.func(**self.kwargs)
                 if out:
@@ -168,13 +225,30 @@ class Worker(QThread):
             self.done.emit(f"[ERROR] {e}")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN WINDOW
+# ─────────────────────────────────────────────────────────────────────────────
 class MainWindow(QMainWindow):
+
+    # 800x480 layout constants
+    STATUS_H  = 36     # status bar height
+    PAGE_H    = 444    # 480 - 36
+    MARGIN    = 10     # page content margins
+    BTN_BAR_H = 52     # fixed bottom button bar on every page
+    TILE_H    = 185    # module tile height  (2 rows fit in PAGE_H with title+log)
+    ATTACK_H  = 54     # attack list row height
+    INPUT_H   = 34     # text input height
+    LABEL_H   = 20     # small label height
+    DIV_H     = 10     # divider spacing
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SentinelPi")
-        self.setGeometry(0, 0, 800, 480)
         self.setStyleSheet(STYLE)
         self._worker = None
+
+        # ── Fullscreen ────────────────────────────────────────────────
+        self.showFullScreen()
 
         root = QWidget()
         root_layout = QVBoxLayout(root)
@@ -185,6 +259,7 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self._build_status_bar())
 
         self.stack = QStackedWidget()
+        self.stack.setFixedHeight(self.PAGE_H)
         root_layout.addWidget(self.stack)
 
         self.page_main = self._build_main_menu()
@@ -195,7 +270,7 @@ class MainWindow(QMainWindow):
         self._clock.timeout.connect(self._refresh_status)
         self._clock.start(30_000)
 
-    # ── Navigation ────────────────────────────────────────────────────────
+    # ── Navigation ────────────────────────────────────────────────────
 
     def _push(self, page):
         self.stack.addWidget(page)
@@ -212,89 +287,164 @@ class MainWindow(QMainWindow):
         self.stack.removeWidget(current)
         current.deleteLater()
 
-    # ── Shared run helper (called by all page files via self.w._run) ──────
+    # ── Run helper ────────────────────────────────────────────────────
 
     def _run(self, func, kwargs, log_widget, btn_exec):
         log_widget.append("[*] Running...")
         btn_exec.setEnabled(False)
         self._worker = Worker(func, kwargs)
-
-        # Each line the module emits via log() appears immediately
         self._worker.line_ready.connect(log_widget.append)
-
-        def on_done(error_msg):
-            if error_msg:
-                log_widget.append(error_msg)
+        def on_done(err):
+            if err:
+                log_widget.append(err)
             else:
                 log_widget.append("[*] Done.")
             if hasattr(self, "global_log"):
-                ts = datetime.now().strftime("%H:%M:%S")
-                log_widget_text = log_widget.toPlainText().strip().splitlines()
-                last = log_widget_text[-1] if log_widget_text else ""
-                self.global_log.append(f"[{ts}] {last[:80]}")
+                lines = log_widget.toPlainText().strip().splitlines()
+                last  = lines[-1] if lines else ""
+                ts    = datetime.now().strftime("%H:%M:%S")
+                self.global_log.append(f"[{ts}] {last[:90]}")
             btn_exec.setEnabled(True)
-
         self._worker.done.connect(on_done)
         self._worker.start()
 
-    # ── Shared attack list builder (called by all page files) ─────────────
+    # ── Attack list page ──────────────────────────────────────────────
 
     def _attack_list(self, module_title, attacks):
         """
-        Builds a scrollable list of attack buttons and pushes it.
-        attacks = [("Button Label", callback_fn), ...]
+        Scrollable list of attack buttons.
+        attacks = [("Name", callback), ...]
         """
         page = QWidget()
-        lay = QVBoxLayout(page)
-        lay.setContentsMargins(16, 10, 16, 10)
-        lay.setSpacing(10)
+        page.setFixedSize(800, self.PAGE_H)
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(self.MARGIN, 8, self.MARGIN, 0)
+        outer.setSpacing(6)
 
+        # Title
         lbl = QLabel(module_title)
         lbl.setObjectName("pageTitle")
-        lay.addWidget(lbl)
+        lbl.setFixedHeight(28)
+        outer.addWidget(lbl)
 
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        lay.addWidget(line)
+        line = QFrame(); line.setFrameShape(QFrame.HLine)
+        outer.addWidget(line)
 
+        # Scrollable button list
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        inner = QWidget()
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        inner  = QWidget()
         inner_lay = QVBoxLayout(inner)
-        inner_lay.setSpacing(8)
+        inner_lay.setContentsMargins(0, 4, 0, 4)
+        inner_lay.setSpacing(6)
 
         for name, callback in attacks:
             btn = QPushButton(name)
             btn.setObjectName("attackBtn")
-            btn.setMinimumHeight(60)
-            # Use default argument to capture callback value, not reference
+            btn.setFixedHeight(self.ATTACK_H)
             btn.clicked.connect(lambda checked, cb=callback: cb())
             inner_lay.addWidget(btn)
 
         inner_lay.addStretch()
         scroll.setWidget(inner)
-        lay.addWidget(scroll)
+        outer.addWidget(scroll)
 
-        back = QPushButton("BACK")
-        back.setObjectName("backBtn")
-        back.clicked.connect(lambda: self._show(self.page_main))
-        lay.addWidget(back)
+        # Bottom bar
+        outer.addWidget(self._make_bottom_bar([
+            self._mk_back(lambda: self._show(self.page_main))
+        ]))
 
         self._push(page)
 
-    # ── Status bar ────────────────────────────────────────────────────────
+    # ── Widget factory helpers ─────────────────────────────────────────
+
+    def _mk_back(self, fn=None):
+        btn = QPushButton("BACK")
+        btn.setObjectName("backBtn")
+        btn.clicked.connect(fn if fn else self._pop)
+        return btn
+
+    def _mk_exec(self, label="EXECUTE"):
+        btn = QPushButton(label)
+        btn.setObjectName("execBtn")
+        return btn
+
+    def _mk_stop(self, label="STOP"):
+        btn = QPushButton(label)
+        btn.setObjectName("stopBtn")
+        btn.setEnabled(False)
+        return btn
+
+    def _mk_save(self, log_widget, name):
+        btn = QPushButton("SAVE")
+        btn.setObjectName("saveBtn")
+        def save():
+            from ui.helpers import CAPTURE_DIR
+            text = log_widget.toPlainText().strip()
+            if not text:
+                return
+            ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+            path = os.path.join(CAPTURE_DIR, f"{name}_{ts}.txt")
+            with open(path, "w") as f:
+                f.write(text)
+            log_widget.append(f"[*] Saved → {path}")
+        btn.clicked.connect(save)
+        return btn
+
+    def _make_bottom_bar(self, buttons):
+        """Fixed-height bottom bar holding action buttons."""
+        bar = QWidget()
+        bar.setFixedHeight(self.BTN_BAR_H)
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(0, 6, 0, 6)
+        lay.setSpacing(8)
+        for b in buttons:
+            b.setFixedHeight(40)
+            lay.addWidget(b)
+        return bar
+
+    def _make_log(self, height):
+        box = QTextEdit()
+        box.setObjectName("logBox")
+        box.setReadOnly(True)
+        box.setFixedHeight(height)
+        return box
+
+    def _make_input(self, label_text, placeholder="", default=""):
+        lbl   = QLabel(label_text)
+        lbl.setObjectName("inputLabel")
+        lbl.setFixedHeight(self.LABEL_H)
+        field = QLineEdit(default)
+        field.setObjectName("inputField")
+        field.setPlaceholderText(placeholder)
+        field.setFixedHeight(self.INPUT_H)
+        return lbl, field
+
+    def _make_divider(self):
+        f = QFrame(); f.setFrameShape(QFrame.HLine)
+        return f
+
+    def _make_title(self, text):
+        lbl = QLabel(text)
+        lbl.setObjectName("pageTitle")
+        lbl.setFixedHeight(28)
+        return lbl
+
+    # ── Status bar ────────────────────────────────────────────────────
 
     def _build_status_bar(self):
         bar = QWidget()
         bar.setObjectName("statusBar")
-        bar.setFixedHeight(38)
+        bar.setFixedHeight(self.STATUS_H)
         lay = QHBoxLayout(bar)
         lay.setContentsMargins(10, 0, 10, 0)
+        lay.setSpacing(8)
 
-        self.lbl_status = QLabel("SENTINELPI  |  READY")
+        self.lbl_status = QLabel("SENTINELPI")
         self.lbl_status.setObjectName("statusLabel")
         lay.addWidget(self.lbl_status)
+
         lay.addStretch()
 
         self.lbl_time = QLabel()
@@ -302,19 +452,25 @@ class MainWindow(QMainWindow):
         self._refresh_status()
         lay.addWidget(self.lbl_time)
 
-        # ── Remove these 4 lines to hide the settings button ──
+        # ── Remove these 4 lines to remove settings ──
         btn_set = QPushButton("SETTINGS")
         btn_set.setObjectName("settingsBtn")
-        btn_set.setFixedHeight(28)
+        btn_set.setFixedHeight(26)
         btn_set.clicked.connect(self._settings_screen)
         lay.addWidget(btn_set)
-        # ── end settings button ──
+        # ────────────────────────────────────────────
 
-        btn_off = QPushButton("POWER OFF")
-        btn_off.setObjectName("dangerBtn")
-        btn_off.setFixedHeight(28)
-        btn_off.clicked.connect(lambda: subprocess.call(["sudo", "poweroff"]))
-        lay.addWidget(btn_off)
+        btn_pwr = QPushButton("POWER OFF")
+        btn_pwr.setObjectName("powerBtn")
+        btn_pwr.setFixedHeight(26)
+        btn_pwr.clicked.connect(lambda: subprocess.call(["sudo", "poweroff"]))
+        lay.addWidget(btn_pwr)
+
+        btn_close = QPushButton("CLOSE")
+        btn_close.setObjectName("closeBtn")
+        btn_close.setFixedHeight(26)
+        btn_close.clicked.connect(self.close)
+        lay.addWidget(btn_close)
 
         return bar
 
@@ -327,77 +483,70 @@ class MainWindow(QMainWindow):
                 bat = open(p).read().strip() + "%"
         except Exception:
             pass
-        self.lbl_time.setText(f"BAT:{bat}  {now}    ")
+        self.lbl_time.setText(f"BAT:{bat}  {now}  ")
 
-    # ── Settings screen ── Remove this whole method if not needed ─────────
+    # ── Settings ── Remove this method if not needed ───────────────────
     def _settings_screen(self):
         from ui.helpers import CAPTURE_DIR
         page = QWidget()
+        page.setFixedSize(800, self.PAGE_H)
         lay = QVBoxLayout(page)
-        lay.setContentsMargins(20, 10, 20, 10)
-        lay.setSpacing(12)
+        lay.setContentsMargins(self.MARGIN, 8, self.MARGIN, 0)
+        lay.setSpacing(6)
 
-        lbl = QLabel("SETTINGS")
-        lbl.setObjectName("pageTitle")
-        lay.addWidget(lbl)
+        lay.addWidget(self._make_title("SETTINGS"))
+        lay.addWidget(self._make_divider())
 
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        lay.addWidget(line)
-
-        lay.addWidget(QLabel("Capture folder:", objectName="inputLabel"))
-        path_field = QLineEdit(CAPTURE_DIR)
-        path_field.setObjectName("inputField")
-        lay.addWidget(path_field)
-
+        lbl, f = self._make_input("Capture folder", CAPTURE_DIR, CAPTURE_DIR)
+        lay.addWidget(lbl); lay.addWidget(f)
         lay.addStretch()
 
-        back = QPushButton("BACK")
-        back.setObjectName("backBtn")
-        back.clicked.connect(lambda: self._show(self.page_main))
-        lay.addWidget(back)
-
+        lay.addWidget(self._make_bottom_bar([
+            self._mk_back(lambda: self._show(self.page_main))
+        ]))
         self._push(page)
-    # ── end settings ─────────────────────────────────────────────────────
+    # ──────────────────────────────────────────────────────────────────
 
-    # ── Main menu ─────────────────────────────────────────────────────────
+    # ══ MAIN MENU ═════════════════════════════════════════════════════
 
     def _build_main_menu(self):
         page = QWidget()
+        page.setFixedSize(800, self.PAGE_H)
         lay = QVBoxLayout(page)
-        lay.setContentsMargins(16, 10, 16, 10)
-        lay.setSpacing(12)
+        lay.setContentsMargins(self.MARGIN, 8, self.MARGIN, 8)
+        lay.setSpacing(8)
 
-        lbl = QLabel("SENTINELPI")
-        lbl.setObjectName("pageTitle")
-        lay.addWidget(lbl)
+        lay.addWidget(self._make_title("SENTINELPI"))
 
-        # ── Module grid ──
-        # To add a new module: add one row here, then create ui/pages/yourmodule.py
+        # 2x2 grid — each tile fills available height evenly
         grid = QGridLayout()
-        grid.setSpacing(12)
+        grid.setSpacing(8)
+
+        # To add a module: add one entry here + create ui/pages/yourmodule.py
         modules = [
             ("BAD USB",    lambda: BadUSBPage(self).build_menu()),
             ("INFRARED",   lambda: InfraredPage(self).build_menu()),
             ("WIRELESS",   lambda: WirelessPage(self).build_menu()),
             ("NFC / RFID", lambda: NFCPage(self).build_menu()),
         ]
-        for i, (label, callback) in enumerate(modules):
+        for i, (label, cb) in enumerate(modules):
             btn = QPushButton(label)
             btn.setObjectName("moduleTile")
-            btn.setMinimumHeight(100)
-            # Use default argument to capture callback value, not reference
-            btn.clicked.connect(lambda checked, cb=callback: cb())
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            btn.clicked.connect(lambda checked, c=cb: c())
             grid.addWidget(btn, i // 2, i % 2)
 
-        lay.addLayout(grid)
-        lay.addStretch()
+        # Give both rows equal stretch
+        grid.setRowStretch(0, 1)
+        grid.setRowStretch(1, 1)
 
-        # Small activity log at the bottom of the main menu
+        lay.addLayout(grid, stretch=1)
+
+        # Small activity log at the bottom
         self.global_log = QTextEdit()
         self.global_log.setObjectName("logBox")
         self.global_log.setReadOnly(True)
-        self.global_log.setFixedHeight(60)
+        self.global_log.setFixedHeight(52)
         lay.addWidget(self.global_log)
 
         return page
