@@ -15,7 +15,7 @@ echo "=== SentinelPi Autostart Setup ==="
 
 # ── Step 1: Enable console autologin (no desktop on boot) ────────────────────
 # This makes the Pi boot to a terminal logged in as 'rpi', not the desktop.
-sudo raspi-config nonint do_boot_behaviour B2   # Boot to CLI, autologin
+sudo raspi-config nonint do_boot_behaviour B1   # Boot to CLI, autologin
 
 # ── Step 2: Install onscreen keyboard ────────────────────────────────────────
 echo "[*] Installing matchbox-keyboard..."
