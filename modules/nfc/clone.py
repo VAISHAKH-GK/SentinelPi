@@ -25,7 +25,7 @@ def _init_pn532(log):
         import board, busio
         from adafruit_pn532.i2c import PN532_I2C
         i2c   = busio.I2C(board.SCL, board.SDA)
-        pn532 = PN532_I2C(i2c, debug=False)
+        pn532 = PN532_I2C(i2c, debug=False, address=0x28)
         pn532.SAM_configuration()
         ic, ver, rev, support = pn532.firmware_version
         log(f"[*] PN532 ready — firmware v{ver}.{rev}")
